@@ -32,10 +32,11 @@ class FlowModifier:
 
     def remove_stream(self, stream_id):
         del self.streams[stream_id]
-        # a, b, switches, c = self.get_topology()
-        #
-        # for key, switch in switches.items():
-        #     self.odl.delete_request("opendaylight-inventory:nodes/node/" + switch.id + "/table/0/flow/" + str(stream_id))
+        a, b, switches, c = self.get_topology()
+
+        for key, switch in switches.items():
+            self.odl.delete_request("opendaylight-inventory:nodes/node/" + switch.id + "/table/0/flow/" + str(stream_id))
+            self.odl.delete_request("opendaylight-inventory:nodes/node/" + switch.id + "/flow-node-inventory:group/" + str(stream_id))
 
     def get_topology(self):
         response = self.odl.get_request("network-topology:network-topology")
@@ -159,6 +160,7 @@ class FlowModifier:
                 switch.add_action(stream.stream_id, a)
 
         for key, switch in switches.items():
+            self.push_group(switch)
             self.push_flow(switch)
 
     def push_flow(self, switch):
@@ -170,15 +172,6 @@ class FlowModifier:
         counter = 5
 
         for stream_id in switch.actions:
-            # root = Element('flow', {"xmlns": "urn:opendaylight:flow:inventory"})
-            # SubElement(root, 'priority').text = 2
-            # SubElement(root, 'flow-name').text = "Foo"
-            # match = SubElement(root, 'match')
-            #
-            # SubElement(root, 'id').text = 1
-            # SubElement(root, 'table_id').text = 0
-            # inst = SubElement(root, 'instructions')
-
             counter = counter + 1
             flow = dict()
             flow["id"] = stream_id
@@ -190,7 +183,19 @@ class FlowModifier:
             flow["cookie"] = stream_id*100
             flow["flow-name"] = "stream" + str(stream_id)
             flow["match"] = {}
-            flow["instructions"] = {"instruction": []}
+            flow["instructions"] = {"instruction": [
+                {
+                    "apply-actions": {
+                        "action": [
+                            {
+                                "group-action": {"group-id": stream_id},
+                                "order": 0
+                            }
+                        ]
+                    },
+                    "order": 0
+                }
+            ]}
             instructions = flow["instructions"]["instruction"]
             inst_counter = 0
             for action in switch.actions[stream_id]:
@@ -200,97 +205,19 @@ class FlowModifier:
                                      "ethernet-match": {"ethernet-type": {"type": "2048"}},
                                      "ip-match": {"ip-protocol": "6"}
                                      }
-                    instructions.append({
-                        "apply-actions": {
-                            "action": [
-                                {
-                                    "push-mpls-action": {"ethernet-type": "34887"},
-                                    "order": 1
-                                }, {
-                                    "set-field": {
-                                        "protocol-match-fields": {"mpls-label": stream_id}
-                                    },
-                                    "order": 2
-                                }, {
-                                    "output-action": {"output-node-connector": action.switch_port},
-                                    "order": 3
-                                }
-                            ]
-                        },
-                        "order": inst_counter
-                    })
-                    inst_counter += 1
                 elif action.type is self.CLIENT_TO_MULTI:
                     flow["match"] = {"ipv4-destination": action.dst_ip + "/32", "tcp-destination-port": action.dst_port,
                                      "tcp-source-port": action.src_port,
                                      "ethernet-match": {"ethernet-type": {"type": "2048"}},
                                      "ip-match": {"ip-protocol": "6"}
                                      }
-                    instructions.append({
-                        "apply-actions": {
-                            "action": [
-                                {
-                                    "push-mpls-action": {"ethernet-type": "34887"},
-                                    "order": 1
-                                }, {
-                                    "set-field": {
-                                        "protocol-match-fields": {"mpls-label": stream_id}
-                                    },
-                                    "order": 2
-                                }, {
-                                    "output-action": {"output-node-connector": action.switch_port},
-                                    "order": 3
-                                }
-                            ]
-                        },
-                        "order": inst_counter
-                    })
-                    inst_counter += 1
                 elif action.type is self.FORWARD:
                     flow["match"] = {"protocol-match-fields": {"mpls-label": stream_id},
                                      "ethernet-match": {"ethernet-type": {"type": "34887"}}}
-                    instructions.append({
-                        "apply-actions": {
-                            "action": [
-                                {
-                                    "output-action": {"output-node-connector": action.switch_port},
-                                    "order": 1
-                                }
-                            ]
-                        },
-                        "order": inst_counter
-                    })
-                    inst_counter += 1
                 elif action.type is self.CONVERT_TO_UNI:
                     flow["match"] = {"protocol-match-fields": {"mpls-label": stream_id},
                                      "ethernet-match": {"ethernet-type": {"type": "34887"}}}
-                    instructions.append({
-                        "apply-actions": {
-                            "action": [
-                                {
-                                    "pop-mpls-action": {"ethernet-type": "34887"},
-                                    "order": 1
-                                }, {
-                                    "set-field": {
-                                        "ipv4-destination": action.dst_ip + "/32",
-                                        "ipv4-source": action.src_ip + "/32",
-                                        "tcp-source-port": action.src_port,
-                                        "tcp-destination-port": action.dst_port,
-                                        "ethernet-match": {
-                                            "ethernet-source": {"address": action.src_mac},
-                                            "ethernet-destination": {"address": action.dst_mac}
-                                        }
-                                    },
-                                    "order": 2
-                                }, {
-                                    "output-action": {"output-node-connector": action.switch_port},
-                                    "order": 3
-                                }
-                            ]
-                        },
-                        "order": inst_counter
-                    })
-                    inst_counter += 1
+
             #flows.append(flow)
             print("Sending this data to " + switch.id  + " flow " + str(stream_id))
             print(flow)
@@ -298,6 +225,101 @@ class FlowModifier:
             self.odl.post_request("opendaylight-inventory:nodes/node/" + switch.id + "/table/0/flow/" + str(stream_id), data)
         #data = json.dumps(full).encode('utf8')
         #self.odl.post_request("opendaylight-inventory:nodes/node/" + switch.id + "/table/1", data)
+
+    def push_group(self, switch):
+        for stream_id in switch.actions:
+            inst_counter = 0
+            group = dict()
+            group["group-type"] = "group-all"
+            group["group-id"] = stream_id
+            group["group-name"] = "stream" + str(stream_id)
+            group["buckets"] = {"bucket": []}
+            group["barrier"] = True
+            buckets = group["buckets"]["bucket"]
+            for action in switch.actions[stream_id]:
+                if action.type is self.PROXY_TO_MULTI:
+                    bucket = {
+                        "bucket-id": inst_counter,
+                        "action": [
+                            {
+                                "push-mpls-action": {"ethernet-type": "34887"},
+                                "order": 1
+                            }, {
+                                "set-field": {
+                                    "protocol-match-fields": {"mpls-label": stream_id}
+                                },
+                                "order": 2
+                            }, {
+                                "output-action": {"output-node-connector": action.switch_port},
+                                "order": 3
+                            }
+                        ]
+                    }
+                    inst_counter += 1
+                    buckets.append(bucket)
+                elif action.type is self.CLIENT_TO_MULTI:
+                    bucket = {
+                        "bucket-id": inst_counter,
+                        "action": [
+                            {
+                                "push-mpls-action": {"ethernet-type": "34887"},
+                                "order": 1
+                            }, {
+                                "set-field": {
+                                    "protocol-match-fields": {"mpls-label": stream_id}
+                                },
+                                "order": 2
+                            }, {
+                                "output-action": {"output-node-connector": action.switch_port},
+                                "order": 3
+                            }
+                        ]
+                    }
+                    inst_counter += 1
+                    buckets.append(bucket)
+                elif action.type is self.FORWARD:
+                    bucket = {
+                        "bucket-id": inst_counter,
+                        "action": [
+                            {
+                                "output-action": {"output-node-connector": action.switch_port},
+                                "order": 1
+                            }
+                        ]
+                    }
+                    inst_counter += 1
+                    buckets.append(bucket)
+                elif action.type is self.CONVERT_TO_UNI:
+                    bucket = {
+                        "bucket-id": inst_counter,
+                        "action": [
+                            {
+                                "pop-mpls-action": {"ethernet-type": "34887"},
+                                "order": 1
+                            }, {
+                                "set-field": {
+                                    "ipv4-destination": action.dst_ip + "/32",
+                                    "ipv4-source": action.src_ip + "/32",
+                                    "tcp-source-port": action.src_port,
+                                    "tcp-destination-port": action.dst_port,
+                                    "ethernet-match": {
+                                        "ethernet-source": {"address": action.src_mac},
+                                        "ethernet-destination": {"address": action.dst_mac}
+                                    }
+                                },
+                                "order": 2
+                            }, {
+                                "output-action": {"output-node-connector": action.switch_port},
+                                "order": 3
+                            }
+                        ]
+                    }
+                    inst_counter += 1
+                    buckets.append(bucket)
+            print("Sending this data to " + switch.id  + " group " + str(stream_id))
+            print({"group": [group]})
+            data = json.dumps({"group": [group]}).encode('utf8')
+            self.odl.post_request("opendaylight-inventory:nodes/node/" + switch.id + "/flow-node-inventory:group/" + str(stream_id), data)
 
 
 class VideoStream:
