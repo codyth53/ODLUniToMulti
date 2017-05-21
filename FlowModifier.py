@@ -3,6 +3,7 @@ from collections import deque
 from xml.etree.ElementTree import (Element, SubElement)
 import xml.etree.ElementTree as ET
 from ODLConnector import ODLConnector
+from time import sleep
 
 
 class FlowModifier:
@@ -36,7 +37,9 @@ class FlowModifier:
 
         for key, switch in switches.items():
             self.odl.delete_request("opendaylight-inventory:nodes/node/" + switch.id + "/table/0/flow/" + str(stream_id))
+            self.odl.delete_request("opendaylight-inventory:nodes/node/" + switch.id + "/table/0/flow/" + str(stream_id + 50))
             self.odl.delete_request("opendaylight-inventory:nodes/node/" + switch.id + "/flow-node-inventory:group/" + str(stream_id))
+            self.odl.delete_request("opendaylight-inventory:nodes/node/" + switch.id + "/flow-node-inventory:group/" + str(stream_id + 50))
 
     def get_topology(self):
         response = self.odl.get_request("network-topology:network-topology")
@@ -138,7 +141,7 @@ class FlowModifier:
                 switch.add_action(stream.stream_id, a)
                 a = Action(self.CLIENT_TO_MULTI, switch_port=switch.outlinks[switch.parent.id], dst_ip=stream.fake_dst_ip,
                            dst_port=stream.fake_dst_port, src_port=stream.ip_addresses[node.ip][0])
-                switch.add_action(stream.stream_id, a)
+                switch.add_action(stream.stream_id + 50, a)
                 last_switch = switch
                 if switch.parent is not None:
                     switch = switch.parent
@@ -147,7 +150,7 @@ class FlowModifier:
                     a = Action(self.FORWARD, switch_port=switch.outlinks[last_switch.id])
                     switch.add_action(stream.stream_id, a)
                     a = Action(self.FORWARD, switch_port=switch.outlinks[switch.parent.id])
-                    switch.add_action(stream.stream_id, a)
+                    switch.add_action(stream.stream_id + 50, a)
                     last_switch = switch
                     switch = switch.parent
                 # Convert to multi
@@ -157,11 +160,13 @@ class FlowModifier:
                 a = Action(self.CONVERT_TO_UNI, switch_port=switch.outlinks[self.parent_id], src_ip=stream.fake_src_ip,
                            src_mac=stream.fake_src_mac, src_port=stream.fake_src_port,
                            dst_ip=nodes[self.parent_id].ip, dst_port=80, dst_mac=nodes[self.parent_id].mac)
-                switch.add_action(stream.stream_id, a)
+                switch.add_action(stream.stream_id + 50, a)
 
         for key, switch in switches.items():
             self.push_group(switch)
             self.push_flow(switch)
+
+        sleep(.25)
 
     def push_flow(self, switch):
         table = {}
