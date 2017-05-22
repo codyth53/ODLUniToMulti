@@ -303,7 +303,7 @@ class FlowModifier:
                         "bucket-id": inst_counter,
                         "action": [
                             {
-                                "pop-mpls-action": {"ethernet-type": "34887"},
+                                "pop-mpls-action": {"ethernet-type": "2048"},
                                 "order": 1
                             }, {
                                 "set-field": {
@@ -333,7 +333,7 @@ class FlowModifier:
 
 class VideoStream:
     active_ids=[]
-    current_id = 5
+    current_id = 16
 
     def __init__(self, fake_src_ip="", fake_src_mac="", fake_src_port="",
                  fake_dst_ip="", fake_dst_mac="", fake_dst_port="", ips={}):
