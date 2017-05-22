@@ -117,15 +117,16 @@ class FlowModifier:
 
         class Action:
             def __init__(self, type, src_ip=None, dst_ip=None, src_mac=None, dst_mac=None,
-                         src_port=None, dst_port=None, switch_port=None):
+                         src_tcp_port=None, dst_tcp_port=None, src_switch_port = None, dst_switch_port=None):
                 self.type = type
-                self.switch_port = switch_port
+                self.src_switch_port = src_switch_port
+                self.dst_switch_port = dst_switch_port
                 self.src_ip = src_ip
                 self.dst_ip = dst_ip
                 self.src_mac = src_mac
                 self.dst_mac = dst_mac
-                self.src_port = src_port
-                self.dst_port = dst_port
+                self.src_tcp_port = src_tcp_port
+                self.dst_tcp_port = dst_tcp_port
 
         for key, stream in self.streams.items():
             stream.fake_dst_mac = ip_addresses[stream.fake_dst_ip].mac
@@ -135,31 +136,33 @@ class FlowModifier:
                 node = ip_addresses[ip]
                 switch = node.parent
                 # Convert back to uni
-                a = Action(self.CONVERT_TO_UNI, dst_ip=node.ip, dst_mac=node.mac, src_port=stream.fake_dst_port,
-                           dst_port=stream.ip_addresses[node.ip][0], switch_port=node.parent.outlinks[node.id],
+                a = Action(self.CONVERT_TO_UNI, dst_ip=node.ip, dst_mac=node.mac, src_tcp_port=stream.fake_dst_port,
+                           dst_tcp_port=stream.ip_addresses[node.ip][0], dst_switch_port=node.parent.outlinks[node.id],
                            src_mac=stream.fake_dst_mac, src_ip=stream.fake_dst_ip)
                 switch.add_action(stream.stream_id, a)
-                a = Action(self.CLIENT_TO_MULTI, switch_port=switch.outlinks[switch.parent.id], dst_ip=stream.fake_dst_ip,
-                           dst_port=stream.fake_dst_port, src_port=stream.ip_addresses[node.ip][0])
+                a = Action(self.CLIENT_TO_MULTI, dst_switch_port=switch.outlinks[switch.parent.id], dst_ip=stream.fake_dst_ip,
+                           dst_tcp_port=stream.fake_dst_port, src_tcp_port=stream.ip_addresses[node.ip][0])
                 switch.add_action(stream.stream_id + 50, a)
                 last_switch = switch
                 if switch.parent is not None:
                     switch = switch.parent
                 while switch is not top_switch:
                     # forward along
-                    a = Action(self.FORWARD, switch_port=switch.outlinks[last_switch.id])
+                    a = Action(self.FORWARD, dst_switch_port=switch.outlinks[last_switch.id],
+                               src_switch_port=switch.outlinks[switch.parent.id])
                     switch.add_action(stream.stream_id, a)
-                    a = Action(self.FORWARD, switch_port=switch.outlinks[switch.parent.id])
+                    a = Action(self.FORWARD, dst_switch_port=switch.outlinks[switch.parent.id],
+                               src_switch_port=switch.outlinks[last_switch.id])
                     switch.add_action(stream.stream_id + 50, a)
                     last_switch = switch
                     switch = switch.parent
                 # Convert to multi
-                a = Action(self.PROXY_TO_MULTI, switch_port=switch.outlinks[last_switch.id], dst_ip=stream.fake_src_ip,
-                           dst_port=stream.fake_src_port)
+                a = Action(self.PROXY_TO_MULTI, dst_switch_port=switch.outlinks[last_switch.id], dst_ip=stream.fake_src_ip,
+                           dst_tcp_port=stream.fake_src_port)
                 switch.add_action(stream.stream_id, a) # for proxy
-                a = Action(self.CONVERT_TO_UNI, switch_port=switch.outlinks[self.parent_id], src_ip=stream.fake_src_ip,
-                           src_mac=stream.fake_src_mac, src_port=stream.fake_src_port,
-                           dst_ip=nodes[self.parent_id].ip, dst_port=80, dst_mac=nodes[self.parent_id].mac)
+                a = Action(self.CONVERT_TO_UNI, dst_switch_port=switch.outlinks[self.parent_id], src_ip=stream.fake_src_ip,
+                           src_mac=stream.fake_src_mac, src_tcp_port=stream.fake_src_port,
+                           dst_ip=nodes[self.parent_id].ip, dst_tcp_port=80, dst_mac=nodes[self.parent_id].mac)
                 switch.add_action(stream.stream_id + 50, a)
 
         for key, switch in switches.items():
@@ -206,18 +209,19 @@ class FlowModifier:
             for action in switch.actions[stream_id]:
                 if action.type is self.PROXY_TO_MULTI:
                     flow["match"] = {"ipv4-destination": action.dst_ip + "/32",
-                                     "tcp-destination-port": action.dst_port,
+                                     "tcp-destination-port": action.dst_tcp_port,
                                      "ethernet-match": {"ethernet-type": {"type": "2048"}},
                                      "ip-match": {"ip-protocol": "6"}
                                      }
                 elif action.type is self.CLIENT_TO_MULTI:
-                    flow["match"] = {"ipv4-destination": action.dst_ip + "/32", "tcp-destination-port": action.dst_port,
-                                     "tcp-source-port": action.src_port,
+                    flow["match"] = {"ipv4-destination": action.dst_ip + "/32", "tcp-destination-port": action.dst_tcp_port,
+                                     "tcp-source-port": action.src_tcp_port,
                                      "ethernet-match": {"ethernet-type": {"type": "2048"}},
                                      "ip-match": {"ip-protocol": "6"}
                                      }
                 elif action.type is self.FORWARD:
-                    flow["match"] = {"protocol-match-fields": {"mpls-label": stream_id},
+                    flow["match"] = {"in-port": action.src_switch_port,
+                                     "protocol-match-fields": {"mpls-label": stream_id},
                                      "ethernet-match": {"ethernet-type": {"type": "34887"}}}
                 elif action.type is self.CONVERT_TO_UNI:
                     flow["match"] = {"protocol-match-fields": {"mpls-label": stream_id},
@@ -255,7 +259,7 @@ class FlowModifier:
                                 },
                                 "order": 2
                             }, {
-                                "output-action": {"output-node-connector": action.switch_port},
+                                "output-action": {"output-node-connector": action.dst_switch_port},
                                 "order": 3
                             }
                         ]
@@ -275,7 +279,7 @@ class FlowModifier:
                                 },
                                 "order": 2
                             }, {
-                                "output-action": {"output-node-connector": action.switch_port},
+                                "output-action": {"output-node-connector": action.dst_switch_port},
                                 "order": 3
                             }
                         ]
@@ -287,7 +291,7 @@ class FlowModifier:
                         "bucket-id": inst_counter,
                         "action": [
                             {
-                                "output-action": {"output-node-connector": action.switch_port},
+                                "output-action": {"output-node-connector": action.dst_switch_port},
                                 "order": 1
                             }
                         ]
@@ -305,8 +309,8 @@ class FlowModifier:
                                 "set-field": {
                                     "ipv4-destination": action.dst_ip + "/32",
                                     "ipv4-source": action.src_ip + "/32",
-                                    "tcp-source-port": action.src_port,
-                                    "tcp-destination-port": action.dst_port,
+                                    "tcp-source-port": action.src_tcp_port,
+                                    "tcp-destination-port": action.dst_tcp_port,
                                     "ethernet-match": {
                                         "ethernet-source": {"address": action.src_mac},
                                         "ethernet-destination": {"address": action.dst_mac}
@@ -314,7 +318,7 @@ class FlowModifier:
                                 },
                                 "order": 2
                             }, {
-                                "output-action": {"output-node-connector": action.switch_port},
+                                "output-action": {"output-node-connector": action.dst_switch_port},
                                 "order": 3
                             }
                         ]
