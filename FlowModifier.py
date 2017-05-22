@@ -186,8 +186,8 @@ class FlowModifier:
             flow["table_id"] = 0
             flow["installHw"] = True
             flow["priority"] = 101
-            flow["idle-timeout"] = 10
-            flow["hard-timeout"] = 60
+            flow["idle-timeout"] = 180
+            flow["hard-timeout"] = 180
             flow["cookie"] = stream_id*100
             flow["flow-name"] = "stream" + str(stream_id)
             flow["match"] = {}
@@ -220,16 +220,16 @@ class FlowModifier:
                                      "ip-match": {"ip-protocol": "6"}
                                      }
                 elif action.type is self.FORWARD:
-                    flow["match"] = {"in-port": action.src_switch_port,
-                                     "protocol-match-fields": {"mpls-label": stream_id},
-                                     "ethernet-match": {"ethernet-type": {"type": "34887"}}}
+                    flow["match"] = {
+                                     "vlan-match": {"vlan-id": {"vlan-id-present": "true", "vlan-id": stream_id}},
+                                     "ethernet-match": {"ethernet-type": {"type": "33024"}}}
                 elif action.type is self.CONVERT_TO_UNI:
-                    flow["match"] = {"protocol-match-fields": {"mpls-label": stream_id},
-                                     "ethernet-match": {"ethernet-type": {"type": "34887"}}}
+                    flow["match"] = {"vlan-match": {"vlan-id": {"vlan-id-present": "true", "vlan-id": stream_id}},
+                                     "ethernet-match": {"ethernet-type": {"type": "33024"}}}
 
             #flows.append(flow)
             print("Sending this data to " + switch.id  + " flow " + str(stream_id))
-            print(flow)
+            print({"flow":[flow]})
             data = json.dumps({"flow":[flow]}).encode('utf8')
             self.odl.post_request("opendaylight-inventory:nodes/node/" + switch.id + "/table/0/flow/" + str(stream_id), data)
         #data = json.dumps(full).encode('utf8')
@@ -251,11 +251,19 @@ class FlowModifier:
                         "bucket-id": inst_counter,
                         "action": [
                             {
-                                "push-mpls-action": {"ethernet-type": "34887"},
+                                "push-vlan-action": {"ethernet-type": "33024"},
                                 "order": 1
                             }, {
                                 "set-field": {
-                                    "protocol-match-fields": {"mpls-label": stream_id}
+                                    "vlan-match": {
+                                        "vlan-id": {
+                                            "vlan-id-present": "true",
+                                            "vlan-id": stream_id
+                                        }
+                                    # },
+                                    # "ethernet-match": {
+                                    #     "ethernet-destination": {"address": "55:55:55:55:55:55"}
+                                    }
                                 },
                                 "order": 2
                             }, {
@@ -271,11 +279,16 @@ class FlowModifier:
                         "bucket-id": inst_counter,
                         "action": [
                             {
-                                "push-mpls-action": {"ethernet-type": "34887"},
+                                "push-vlan-action": {"ethernet-type": "33024"},
                                 "order": 1
                             }, {
                                 "set-field": {
-                                    "protocol-match-fields": {"mpls-label": stream_id}
+                                    "vlan-match": {
+                                        "vlan-id": {
+                                            "vlan-id-present": "true",
+                                            "vlan-id": stream_id
+                                        }
+                                    }
                                 },
                                 "order": 2
                             }, {
@@ -303,7 +316,7 @@ class FlowModifier:
                         "bucket-id": inst_counter,
                         "action": [
                             {
-                                "pop-mpls-action": {"ethernet-type": "34887"},
+                                "pop-vlan-action": {},
                                 "order": 1
                             }, {
                                 "set-field": {
