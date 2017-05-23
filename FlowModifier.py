@@ -222,10 +222,10 @@ class FlowModifier:
                 elif action.type is self.FORWARD:
                     flow["match"] = {
                                      "vlan-match": {"vlan-id": {"vlan-id-present": "true", "vlan-id": stream_id}},
-                                     "ethernet-match": {"ethernet-type": {"type": "33024"}}}
+                                     "ethernet-match": {"ethernet-type": {"type": "2048"}}}
                 elif action.type is self.CONVERT_TO_UNI:
                     flow["match"] = {"vlan-match": {"vlan-id": {"vlan-id-present": "true", "vlan-id": stream_id}},
-                                     "ethernet-match": {"ethernet-type": {"type": "33024"}}}
+                                     "ethernet-match": {"ethernet-type": {"type": "2048"}}}
 
             #flows.append(flow)
             print("Sending this data to " + switch.id  + " flow " + str(stream_id))
