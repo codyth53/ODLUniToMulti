@@ -37,17 +37,17 @@ class FileThread(Thread):
             #     pass
             # else:
             headers[header] = self.sender.headers.get(header)
-        print("Getting ready to request")
-        print(headers)
-        print("Prefetching " + headers["Host"] + "  " + self.sender.path)
+        # print("Getting ready to request")
+        # print(headers)
+        # print("Prefetching " + headers["Host"] + "  " + self.sender.path)
         conn = HTTPConnection(headers["Host"], 80)
         conn.request('GET', self.sender.path, None, headers)
         self.response = conn.getresponse()
         self.response_data = self.response.read(self.response.length)
-        print("File " + self.sender.path + " fetched. Sleeping")
+        # print("File " + self.sender.path + " fetched. Sleeping")
         # Set timer here
-        sleep(0.5)
-        print("Preparing to deliver " + self.sender.path)
+        sleep(2)
+        # print("Preparing to deliver " + self.sender.path)
         self.send_file()
         print("Finished delivering " + self.sender.path)
         del file_threads[self.address]
@@ -55,9 +55,9 @@ class FileThread(Thread):
 
     def add_host(self, host, sender):
         self.hosts.append(host)
-        print("Host " + host[0] + " wants file " + sender.path)
+        # print("Host " + host[0] + " wants file " + sender.path)
         if self.sender is sender:
-            print("Host " + host[0] + " is the main sender for " + self.sender.path)
+            # print("Host " + host[0] + " is the main sender for " + self.sender.path)
             self.start()
             return True
         else:
@@ -70,6 +70,7 @@ class FileThread(Thread):
         fl = FlowModifier.get_flow_modifier()
         vs = VideoStream(fake_src_ip=self.sender.client_address[0], fake_src_port=self.sender.client_address[1],
                          fake_dst_ip=self.sender.address_string(), fake_dst_port=80)
+        print(self.sender.path + " has " + str(len(self.hosts)) + " viewers")
         for host in self.hosts:
             vs.add_ip(host[0], host[1], host[2])
         fl.upsert_stream(vs)

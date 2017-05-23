@@ -228,8 +228,8 @@ class FlowModifier:
                                      "ethernet-match": {"ethernet-type": {"type": "2048"}}}
 
             #flows.append(flow)
-            print("Sending this data to " + switch.id  + " flow " + str(stream_id))
-            print({"flow":[flow]})
+            # print("Sending this data to " + switch.id  + " flow " + str(stream_id))
+            # print({"flow":[flow]})
             data = json.dumps({"flow":[flow]}).encode('utf8')
             self.odl.post_request("opendaylight-inventory:nodes/node/" + switch.id + "/table/0/flow/" + str(stream_id), data)
         #data = json.dumps(full).encode('utf8')
@@ -338,8 +338,8 @@ class FlowModifier:
                     }
                     inst_counter += 1
                     buckets.append(bucket)
-            print("Sending this data to " + switch.id  + " group " + str(stream_id))
-            print({"group": [group]})
+            # print("Sending this data to " + switch.id  + " group " + str(stream_id))
+            # print({"group": [group]})
             data = json.dumps({"group": [group]}).encode('utf8')
             self.odl.post_request("opendaylight-inventory:nodes/node/" + switch.id + "/flow-node-inventory:group/" + str(stream_id), data)
 
@@ -367,7 +367,7 @@ class VideoStream:
         while VideoStream.current_id in VideoStream.active_ids:
             VideoStream.current_id = (((VideoStream.current_id - 5) + 1) % 50) + 5
         VideoStream.active_ids.append(VideoStream.current_id)
-        print("Handing out stream id " + str(VideoStream.current_id))
+        # print("Handing out stream id " + str(VideoStream.current_id))
         return VideoStream.current_id
 
     def remove_stream(self):
