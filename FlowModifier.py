@@ -245,35 +245,38 @@ class FlowModifier:
             group["buckets"] = {"bucket": []}
             group["barrier"] = True
             buckets = group["buckets"]["bucket"]
+            forward_links = []
             for action in switch.actions[stream_id]:
                 if action.type is self.PROXY_TO_MULTI:
-                    bucket = {
-                        "bucket-id": inst_counter,
-                        "action": [
-                            {
-                                "push-vlan-action": {"ethernet-type": "33024"},
-                                "order": 1
-                            }, {
-                                "set-field": {
-                                    "vlan-match": {
-                                        "vlan-id": {
-                                            "vlan-id-present": "true",
-                                            "vlan-id": stream_id
+                    if action.dst_switch_port not in forward_links:
+                        bucket = {
+                            "bucket-id": inst_counter,
+                            "action": [
+                                {
+                                    "push-vlan-action": {"ethernet-type": "33024"},
+                                    "order": 1
+                                }, {
+                                    "set-field": {
+                                        "vlan-match": {
+                                            "vlan-id": {
+                                                "vlan-id-present": "true",
+                                                "vlan-id": stream_id
+                                            }
+                                        # },
+                                        # "ethernet-match": {
+                                        #     "ethernet-destination": {"address": "55:55:55:55:55:55"}
                                         }
-                                    # },
-                                    # "ethernet-match": {
-                                    #     "ethernet-destination": {"address": "55:55:55:55:55:55"}
-                                    }
-                                },
-                                "order": 2
-                            }, {
-                                "output-action": {"output-node-connector": action.dst_switch_port},
-                                "order": 3
-                            }
-                        ]
-                    }
-                    inst_counter += 1
-                    buckets.append(bucket)
+                                    },
+                                    "order": 2
+                                }, {
+                                    "output-action": {"output-node-connector": action.dst_switch_port},
+                                    "order": 3
+                                }
+                            ]
+                        }
+                        inst_counter += 1
+                        buckets.append(bucket)
+                        forward_links.append(action.dst_switch_port)
                 elif action.type is self.CLIENT_TO_MULTI:
                     bucket = {
                         "bucket-id": inst_counter,
@@ -300,17 +303,19 @@ class FlowModifier:
                     inst_counter += 1
                     buckets.append(bucket)
                 elif action.type is self.FORWARD:
-                    bucket = {
-                        "bucket-id": inst_counter,
-                        "action": [
-                            {
-                                "output-action": {"output-node-connector": action.dst_switch_port},
-                                "order": 1
-                            }
-                        ]
-                    }
-                    inst_counter += 1
-                    buckets.append(bucket)
+                    if action.dst_switch_port not in forward_links:
+                        bucket = {
+                            "bucket-id": inst_counter,
+                            "action": [
+                                {
+                                    "output-action": {"output-node-connector": action.dst_switch_port},
+                                    "order": 1
+                                }
+                            ]
+                        }
+                        inst_counter += 1
+                        buckets.append(bucket)
+                        forward_links.append(action.dst_switch_port)
                 elif action.type is self.CONVERT_TO_UNI:
                     bucket = {
                         "bucket-id": inst_counter,
