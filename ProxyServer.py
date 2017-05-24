@@ -1,12 +1,18 @@
 import socket
 import ConnThread
 from http.server import HTTPServer
+from socketserver import ThreadingMixIn
 from ConnThread import RequestHandler
+
+
+class ThreadedHTTPServer(ThreadingMixIn, HTTPServer):
+    pass
 
 
 class ProxyServer:
     def __init__(self):
-        server = HTTPServer(('', 80), RequestHandler)
+        # server = HTTPServer(('', 80), RequestHandler)
+        server = ThreadedHTTPServer(('', 80), RequestHandler)
         server.serve_forever()
 
     # def __init__(self, port=8080):

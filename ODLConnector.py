@@ -30,8 +30,8 @@ class ODLConnector:
         return json.loads(data)
 
     def post_request(self, address, data):
-        print("Sending this data:")
-        print(self.ip_address + self.config_address + address)
+        # print("Sending this data:")
+        # print(self.ip_address + self.config_address + address)
         req = urllib.request.Request(self.ip_address + self.config_address + address, data=data,
                                      headers={'content-type': 'application/json'}, method='PUT')
         userAndPass = b64encode(b"admin:admin").decode("ascii")
@@ -41,7 +41,7 @@ class ODLConnector:
         except Exception as e:
             print(e.reason)
         resp = response.read().decode('utf-8')
-        print(resp)
+        # print(resp)
 
         try:
             return json.loads(resp)
@@ -57,7 +57,7 @@ class ODLConnector:
         # return response.read()
 
     def delete_request(self, address):
-        print("Sending delete to " + address)
+        # print("Sending delete to " + address)
         req = urllib.request.Request(self.ip_address + self.config_address + address,
                                      headers={'content-type': 'application/json'}, method='DELETE')
         userAndPass = b64encode(b"admin:admin").decode("ascii")
