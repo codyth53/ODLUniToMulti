@@ -325,19 +325,41 @@ class FlowModifier:
                                 "order": 1
                             }, {
                                 "set-field": {
-                                    "ipv4-destination": action.dst_ip + "/32",
-                                    "ipv4-source": action.src_ip + "/32",
-                                    "tcp-source-port": action.src_tcp_port,
-                                    "tcp-destination-port": action.dst_tcp_port,
                                     "ethernet-match": {
-                                        "ethernet-source": {"address": action.src_mac},
-                                        "ethernet-destination": {"address": action.dst_mac}
+                                        "ethernet-source": {"address": action.src_mac}
                                     }
                                 },
                                 "order": 2
                             }, {
-                                "output-action": {"output-node-connector": action.dst_switch_port},
+                                "set-field": {
+                                    "ethernet-match": {
+                                        "ethernet-destination": {"address": action.dst_mac}
+                                    }
+                                },
                                 "order": 3
+                            }, {
+                                "set-field": {
+                                    "ipv4-destination": action.dst_ip + "/32"
+                                },
+                                "order": 4
+                            }, {
+                                "set-field": {
+                                    "ipv4-source": action.src_ip + "/32"
+                                },
+                                "order": 5
+                            }, {
+                                "set-field": {
+                                    "tcp-source-port": action.src_tcp_port
+                                },
+                                "order": 6
+                            }, {
+                                "set-field": {
+                                    "tcp-destination-port": action.dst_tcp_port
+                                },
+                                "order": 7
+                            }, {
+                                "output-action": {"output-node-connector": action.dst_switch_port},
+                                "order": 8
                             }
                         ]
                     }
