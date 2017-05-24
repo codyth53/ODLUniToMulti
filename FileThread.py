@@ -69,7 +69,7 @@ class FileThread(Thread):
             sleep(0.1)
         fl = FlowModifier.get_flow_modifier()
         vs = VideoStream(fake_src_ip=self.sender.client_address[0], fake_src_port=self.sender.client_address[1],
-                         fake_dst_ip=self.sender.address_string(), fake_dst_port=80)
+                         fake_dst_ip="10.0.0.10", fake_dst_port=80)
         print(self.sender.path + " has " + str(len(self.hosts)) + " viewers")
         for host in self.hosts:
             vs.add_ip(host[0], host[1], host[2])
